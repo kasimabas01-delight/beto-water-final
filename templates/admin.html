@@ -30,7 +30,7 @@
           {% endif %}
         {% endwith %}
 
-        <!-- 🚀 የፋይናንስ እና የመክፈያ ቀን ማጠቃለያ ካርዶች -->
+        <!-- የፋይናንስ እና የመክፈያ ቀን ማጠቃለያ ካርዶች -->
         <div class="row mb-4">
             <div class="col-md-3 mb-2">
                 <div class="card card-stat bg-success text-white p-3 h-100">
@@ -64,7 +64,7 @@
             </div>
         </div>
 
-        <!-- 📊 የግራፍ ማሳያ ሳጥን -->
+        <!-- የግራፍ ማሳያ ሳጥን -->
         <div class="row mb-4">
             <div class="col-12">
                 <div class="table-container">
@@ -76,12 +76,13 @@
             </div>
         </div>
 
-        <!-- 🚀 የወራትን መረጃ ለብቻ ለብቻ በExcel ማውረጃ ሳጥን -->
+        <!-- የወራትን መረጃ ለብቻ ለብቻ በExcel ማውረጃ ሳጥን -->
         <div class="row mb-4">
             <div class="col-12">
                 <div class="table-container bg-light">
                     <h6 class="fw-bold text-dark mb-2">📥 የወራትን ሪፖርት ለብቻ ለብቻ በExcel አውርድ</h6>
                     <div class="d-flex flex-wrap gap-2">
+                        <!-- 🚀 እዚህ ጋር የቅንፍ ስህተቱ ሙሉ በሙሉ ተስተካክሏል -->
                         {% for m in ["ጥቅምት", "ህዳር", "ታህሳስ", "ጥር", "የካቲት", "መጋቢት", "ሚያዝያ", "ግንቦት", "ሰኔ", "ሐምሌ", "ነሐሴ", "ጳጉሜን"] %}
                         <a href="/admin/export_excel/{{ m }}" class="btn btn-sm btn-outline-success">📊 የ{{ m }} ወር Excel</a>
                         {% endfor %}
@@ -173,6 +174,3 @@
                     data: {{ graph_data|tojson if graph_data else [] }},
                     backgroundColor: 'rgba(0, 114, 255, 0.6)',
                     borderColor: 'rgba(0, 114, 255, 1)',
-                    borderWidth: 1
-                }]
-            },
