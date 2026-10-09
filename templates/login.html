@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>የበቶ ውሃ ፍሳሽ - መግቢያ</title>
+    <link rel="stylesheet" href="https://jsdelivr.net">
+    <style>
+        body { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); height: 100vh; font-family: system-ui; }
+        .login-card { border: none; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); background: rgba(255, 255, 255, 0.95); }
+        .btn-gradient { background: linear-gradient(to right, #00c6ff, #0072ff); border: none; color: white; font-weight: bold; }
+        .btn-gradient:hover { color: white; transform: translateY(-1px); }
+    </style>
+</head>
+<body class="d-flex align-items-center">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-5 col-lg-4">
+                
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                  {% if messages %}
+                    {% for category, message in messages %}
+                      <div class="alert alert-{{ category }} text-center p-2 mb-2 small" role="alert">{{ message }}</div>
+                    {% endfor %}
+                  {% endif %}
+                {% endwith %}
+
+                <div class="card login-card p-4 text-center">
+                    <div class="mb-2"><span style="font-size: 2.5rem;">💧</span></div>
+                    <h3 class="fw-bold text-dark mb-1">የበቶ ከተማ አስተዳደር</h3>
+                    <p class="text-muted small mb-4">የውሃና ፍሳሽ አገልግሎት ማዕከል</p>
+                    
+                    <!-- 🔍 ፎርም 1፦ ደንበኞች በቆጣሪ ቁጥር ብቻ የሚፈልጉበት ሳጥን -->
+                    <form method="POST" class="text-start mb-3">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-secondary">🎛️ የቆጣሪ ቁጥርዎን ያስገቡ</label>
+                            <input type="text" name="meter_number" class="form-control form-control-lg text-center fw-bold text-primary" placeholder="ለምሳሌ W-102" required>
+                        </div>
+                        <button type="submit" class="btn btn-gradient w-100 py-2.5 rounded-pill">🔍 ወርሃዊ እዳ እይ</button>
+                    </form>
+
+                    <hr class="text-muted">
+
+                    <!-- 🔒 ፎርም 2፦ የአስተዳዳሪ (Admin) መግቢያ ሳጥን -->
+                    <div class="accordion accordion-flush" id="adminAccordion">
+                        <div class="accordion-item bg-transparent">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed bg-transparent text-primary small justify-content-center" type="button" data-bs-toggle="collapse" data-bs-target="#adminForm">
+                                    ⚙️ የጽ/ቤት አስተዳዳሪ መግቢያ
+                                </button>
+                            </h2>
+                            <div id="adminForm" class="accordion-collapse collapse" data-bs-parent="#adminAccordion">
+                                <form method="POST" class="text-start pt-3">
+                                    <div class="mb-2">
+                                        <input type="text" name="username" class="form-control form-control-sm" placeholder="የአስተዳዳሪ ስም" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <input type="password" name="password" class="form-control form-control-sm" placeholder="ሚስጥር ቁጥር" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-dark btn-sm w-100">ግባ</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://jsdelivr.net"></script>
+</body>
+</html>
