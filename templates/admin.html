@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>የአስተዳዳሪ መቆጣጠሪያ ገጽ</title>
+    <link class="stylesheet" href="https://jsdelivr.net">
+    <script src="https://jsdelivr.net"></script>
+    <style>
+        body { background-color: #f4f7f6; font-family: 'Segoe UI', system-ui; }
+        .navbar-custom { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; }
+        .card-stat { border: none; border-radius: 15px; }
+        .table-container, .chart-container { background: white; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 20px; }
+        .btn-action { border-radius: 8px; font-weight: 500; }
+        .btn-excel { background: linear-gradient(to right, #11998e, #38ef7d); border: none; color: white; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-custom shadow-sm p-3 mb-4">
+        <div class="container-fluid d-flex justify-content-between align-items-center">
+            <span class="navbar-brand mb-0 h1 text-white fw-bold">💧 ጽ/ቤት አስተዳዳሪ ማዕከል</span>
+            <a href="{{ url_for('logout') }}" class="btn btn-outline-light rounded-pill px-4">🔒 በሰላም ውጣ</a>
+        </div>
+    </nav>
+    <div class="container-fluid px-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <div class="row mb-4">
+            <div class="col-md-4 mb-2">
+                <div class="card card-stat bg-white text-dark shadow-sm p-3 border-start border-warning border-5 h-100">
+                    <h6 class="text-muted text-uppercase small">የያዝነው ወር ዕዳ (የ{{ current_month }} ወር)</h6>
+                    <h2 class="fw-bold text-warning mb-0">{{ total_pending }} ብር</h2>
+                </div>
+            </div>
+            <div class="col-md-4 mb-2">
+                <div class="card card-stat bg-white text-dark shadow-sm p-3 border-start border-primary border-5 h-100">
+                    <h6 class="text-muted small">የውሃ ታሪፍ (በ1 ዩኒት)</h6>
+                    <form action="/admin/update_tariff" method="POST" class="d-flex gap-2 mt-1">
+                        <input type="number" step="0.01" name="tariff_rate" class="form-control" value="{{ current_tariff }}" required>
+                        <button type="submit" class="btn btn-primary btn-sm btn-action">አድስ</button>
+                    </form>
+                </div>
+            </div>
+            <div class="col-md-4 mb-2">
+                <div class="card card-stat bg-white text-dark shadow-sm p-3 border-start border-danger border-5 h-100">
+                    <h6 class="text-muted small">የአሁኑን ወር ታሪክ መዝግብና ወር ቀይር</h6>
+                    <form action="/admin/next_month" method="POST" class="d-flex gap-2 mt-1" onsubmit="return confirm('የዚህ ወር መረጃዎች ወደ ታሪክ ሰንጠረዥ ይዛወራሉ!')">
+                        <input type="text" name="next_month_name" class="form-control" placeholder="የቀጣይ ወር ስም" required>
+                        <button type="submit" class="btn btn-danger btn-sm btn-action">አዛውር</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="chart-container">
+                    <h5 class="fw-bold text-dark mb-3">📊 የደንበኞች የ{{ current_month }} ወር የውሃ አጠቃቀም ፍጆታ (በዩኒት)</h5>
+                    <div style="height: 250px; position: relative;">
+                        <canvas id="consumptionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-12">
+                <a href="/admin/export_excel" class="btn btn-excel btn-lg shadow-sm w-100 py-2.5 rounded-3">📥 ሙሉ የደንበኞች መረጃ በExcel አውርድ</a>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-xl-4 col-lg-5 mb-4">
+                <div class="card border-0 shadow-sm p-4" style="border-radius: 15px;">
+                    <h5 class="fw-bold text-primary mb-3">👤 አዲስ ደንበኛ መመዝገብ</h5>
+                    <form action="/admin/add_customer" method="POST">
+                        <div class="mb-2"><input type="text" name="name" class="form-control" placeholder="የደንበኛ ሙሉ ስም" required></div>
+                        <div class="mb-2"><input type="text" name="username" class="form-control" placeholder="የተጠቃሚ ስም" required></div>
+                        <div class="mb-2"><input type="password" name="password" class="form-control" placeholder="የይለፍ ቃል" required></div>
+                        <div class="mb-2"><input type="text" name="phone" class="form-control" placeholder="ስልክ ቁጥር" required></div>
+                        <div class="mb-3"><input type="text" name="meter_number" class="form-control" placeholder="የቆጣሪ ቁጥር" required></div>
+                        <button type="submit" class="btn btn-success w-100 btn-action py-2">💾 ደንበኛውን መዝግብ</button>
+                    </form>
+                </div>
+            </div>
+            <div class="col-xl-8 col-lg-7">
+                <div class="table-container">
+                    <h5 class="fw-bold text-dark mb-3">📋 የደንበኞች መረጃ እና የሂሳብ ማጠቃለያ</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ደንበኛ</th>
+                                    <th>ቆጣሪ</th>
+                                    <th>የቀድሞ</th>
+                                    <th>የአሁኑ</th>
+                                    <th>እዳ</th>
+                                    <th>ሁኔታ</th>
+                                    <th class="text-center">እርምጃዎች</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for c in customers %}
+                                <tr>
+                                    <td><span class="fw-bold text-dark">{{ c.name }}</span><br><small class="text-muted">📱 {{ c.phone }}</small></td>
+                                    <td><span class="badge bg-secondary">{{ c.meter_number }}</span></td>
+                                    <td>{{ c.previous_reading }}</td>
+                                    <td>{{ c.current_reading }}</td>
+                                    <td class="text-danger fw-bold">{{ c.balance }} ብር</td>
+                                    <td><span class="badge rounded-pill p-2 {% if c.status=='Paid' %}bg-success{% else %}bg-danger{% endif %}">{% if c.status=='Paid' %}ተከፍሏል{% else %}አልተከፈለም{% endif %}</span></td>
+                                    <td>
+                                        <div class="d-flex flex-wrap gap-1 justify-content-center">
+                                            <form action="/admin/enter_reading" method="POST" class="d-flex gap-1 align-items-center">
+                                                <input type="hidden" name="user_id" value="{{ c.id }}">
+                                                <input type="number" step="0.01" name="current_reading" class="form-control form-control-sm" placeholder="ንባብ" style="width:75px;" required>
+                                                <button type="submit" class="btn btn-sm btn-primary btn-action">አስላ</button>
+                                            </form>
+                                            {% if c.status == 'Unpaid' %}
+                                            <a href="/admin/pay_bill/{{ c.id }}" class="btn btn-sm btn-success btn-action">💵 ክፍያ አጽድቅ</a>
+                                            <a href="/admin/send_sms/{{ c.id }}" class="btn btn-sm btn-info btn-action text-white">💬 SMS ላክ</a>
+                                            {% endif %}
+                                            <a href="/admin/delete_customer/{{ c.id }}" class="btn btn-sm btn-outline-danger btn-action" onclick="return confirm('እርግጠኛ ነዎት ደንበኛውን መሰረዝ ይፈልጋሉ?')">🗑️ ስርዝ</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const ctx = document.getElementById('consumptionChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: {{ graph_labels|tojson if graph_labels else [] }},
+                datasets: [{
+                    label: 'የውሃ ፍጆታ (ዩኒት)',
+                    data: {{ graph_data|tojson if graph_data else [] }},
+                    backgroundColor: 'rgba(0, 114, 255, 0.6)',
+                    borderColor: 'rgba(0, 114, 255, 1)',
+                    borderWidth: 1,
+                    borderRadius: 5
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    </script>
+</body>
+</html>
