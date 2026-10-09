@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>የበቶ ውሃ - ደንበኛ ማዕከል</title>
+    <link rel="stylesheet" href="https://jsdelivr.net">
+    <style>
+        body { background: #eef2f3; font-family: 'Segoe UI', system-ui; }
+        .receipt-card { border: none; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); background: white; max-width: 550px; }
+        .status-box { border-radius: 12px; padding: 15px; text-align: center; font-weight: bold; }
+        .status-paid { background-color: #d4edda; color: #155724; }
+        .status-unpaid { background-color: #f8d7da; color: #721c24; }
+        .telebirr-box { background: #eef5fc; border-left: 5px solid #0056b3; border-radius: 10px; padding: 12px; }
+        @media print { .no-print { display: none !important; } body { background: white; } }
+    </style>
+</head>
+<body class="py-4">
+    <div class="container d-flex flex-column align-items-center">
+        <div class="card receipt-card p-4 w-100 shadow mb-4">
+            <div class="text-center mb-4">
+                <span style="font-size: 2.5rem;">💧</span>
+                <h4 class="text-primary fw-bold mt-2">የበቶ ከተማ ውሃና ፍሳሽ ጽ/ቤት</h4>
+                <p class="text-muted small">የደንበኛ ወርሃዊ የፍጆታ እና የክፍያ መግለጫ (የ{{ current_month }} ወር)</p>
+            </div>
+            
+            <div class="p-3 bg-light rounded-3 mb-3">
+                <div class="d-flex justify-content-between mb-2"><strong>👤 ስም:</strong> <span>{{ user.name }}</span></div>
+                <div class="d-flex justify-content-between mb-2"><strong>🔢 ቆጣሪ ቁጥር:</strong> <span class="badge bg-dark">{{ user.meter_number }}</span></div>
+                <div class="d-flex justify-content-between"><strong>📱 ስልክ:</strong> <span>{{ user.phone }}</span></div>
+            </div>
+            
+            <div class="row text-center bg-light p-3 rounded-3 mb-3 mx-0">
+                <div class="col-6 border-end">
+                    <small class="text-muted d-block">ያለፈው ንባብ</small>
+                    <span class="fs-5 fw-bold text-secondary">{{ user.previous_reading }}</span>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted d-block">የአሁኑ ንባብ</small>
+                    <span class="fs-5 fw-bold text-primary">{{ user.current_reading }}</span>
+                </div>
+            </div>
+
+            <div class="status-box mb-3 {% if user.status == 'Unpaid' %}status-unpaid{% else %}status-paid{% endif %}">
+                <span class="d-block small text-uppercase">የክፍያ ሁኔታ፦ {% if user.status == 'Unpaid' %}አልተከፈለችም{% else %}ተከፍሏል{% endif %}</span>
+                <span class="fs-2 fw-bold">{{ user.balance }} ብር</span>
+            </div>
+
+            {% if user.status == 'Unpaid' %}
+            <div class="telebirr-box mb-3 no-print">
+                <h6 class="fw-bold text-primary mb-1">📱 በቴሌብር (telebirr) ለመክፈል፡</h6>
+                <p class="small text-dark mb-0">
+                    እባክዎን የቴሌብር መተግበሪያዎን ከፍተው <strong>"የበቶ ውሃ"</strong> መርጠው በቆጣሪ ቁጥርዎ ያክፍሉ ወይም በጽ/ቤቱ የነጋዴ ቁጥር ላይ <strong>{{ user.balance }} ብር</strong> ይክፈሉ።
+                </p>
+            </div>
+            {% endif %}
+
+            <div class="d-flex gap-2 no-print">
+                <button onclick="window.print()" class="btn btn-primary w-50 py-2 rounded-pill fw-bold">🖨️ ደረሰኝ አትም</button>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-secondary w-50 py-2 rounded-pill fw-bold">ውጣ</a>
+            </div>
+        </div>
+
+        <div class="card receipt-card p-4 w-100 shadow no-print">
+            <h5 class="fw-bold text-dark mb-3">📜 የባለፉት ወራት የክፍያና የንባብ ታሪክ</h5>
+            {% if history_bills %}
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered align-middle small text-center">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ወር</th>
+                            <th>የቀድሞ</th>
+                            <th>የአሁኑ</th>
+                            <th>ፍጆታ</th>
+                            <th>የተሰላ ሂሳብ</th>
+                            <th>ሁኔታ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for b in history_bills %}
+                        <tr>
+                            <td class="fw-bold text-primary">{{ b.month_name }}</td>
+                            <td>{{ b.prev_reading }}</td>
+                            <td>{{ b.curr_reading }}</td>
+                            <td>{{ b.consumption }}</td>
+                            <td class="fw-bold">{{ b.amount }} ብር</td>
+                            <td>
+                                <span class="badge {% if b.status=='Paid' %}bg-success{% else %}bg-danger{% endif %}">
+                                    {% if b.status=='Paid' %}ተከፍሏል{% else %}ያልተከፈለ{% endif %}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted small mb-0 text-center">የባለፉት ወራት የታሪክ መዝገብ እስካሁን የለም።</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
