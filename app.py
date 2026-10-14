@@ -4,6 +4,7 @@ import io
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, session, flash, make_response
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.secret_key = 'beto_water_super_secret_key_2026_advanced_v30'
@@ -13,9 +14,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy()
 db.init_app(app)
 
-# -------------------------------------------------------------------------
-# DATABASE MODELS
-# -------------------------------------------------------------------------
 class SystemConfig(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     current_month_name = db.Column(db.String(50), default="ጥቅምት")
@@ -28,7 +26,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     username = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(200), nullable=False) # ማሳሰቢያ፡ ለደህንነት ሲባል በኋላ ላይ Werkzeug Hashing ቢጠቀሙ ይመረጣል
+    password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), default='customer')
     phone = db.Column(db.String(20))
     meter_number = db.Column(db.String(50), unique=True, nullable=True)
@@ -62,9 +60,6 @@ with app.app_context():
         db.session.add(config)
     db.session.commit()
 
-# -------------------------------------------------------------------------
-# TARIFF CALCULATION (የደረጃ ታሪፍ ስሌት)
-# -------------------------------------------------------------------------
 def calculate_block_tariff(consumption):
     amount = 0.0
     if consumption <= 10:
@@ -75,9 +70,6 @@ def calculate_block_tariff(consumption):
         amount = (10 * 15.0) + (10 * 20.0) + ((consumption - 20) * 30.0)
     return amount
 
-# -------------------------------------------------------------------------
-# ROUTES & AUTHENTICATION
-# -------------------------------------------------------------------------
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -85,6 +77,8 @@ def login():
         if 'username' in request.form and 'password' in request.form:
             username = request.form['username'].strip()
             password = request.form['password'].strip()
+            
+            # ደህንነቱ የተጠበቀ አስተዳዳሪ መግቢያ (ለጊዜው ቀጥታ ፍተሻ)
             if username == 'beto' and password == 'beto@1234':
                 session.clear()
                 session['role'] = 'admin'
@@ -102,15 +96,6 @@ def login():
             flash('ይህ የቆጣሪ ቁጥር በሲስተሙ ውስጥ አልተገኘም!', 'danger')
     return render_template('login.html')
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    flash('በስኬት ወጥተዋል!', 'success')
-    return redirect(url_for('login'))
-
-# -------------------------------------------------------------------------
-# ADMIN DASHBOARD
-# -------------------------------------------------------------------------
 @app.route('/admin')
 def admin_dashboard():
     if session.get('role') != 'admin':
@@ -155,10 +140,14 @@ def add_customer():
         return redirect(url_for('login'))
     name = request.form['name']
     username = request.form['username']
-    password = request.form['password']
+    raw_password = request.form['password']
     phone = request.form['phone']
     meter_number = request.form['meter_number']
-    new_cust = User(name=name, username=username, password=password, phone=phone, meter_number=meter_number)
+    
+    # የይለፍ ቃልን ሃሽ በማድረግ ደህንነቱን መጠበቅ
+    hashed_password = generate_password_hash(raw_password)
+    
+    new_cust = User(name=name, username=username, password=hashed_password, phone=phone, meter_number=meter_number)
     try:
         db.session.add(new_cust)
         db.session.commit()
@@ -190,7 +179,7 @@ def enter_reading():
         db.session.commit()
         flash('የወሩ ፍጆታ በደረጃ ታሪፍ በትክክል ተሰልቷል!', 'success')
     else:
-        flash('የገባው የአሁን ንባብ ከቀደመው ንባብ ማነስ የለበትም!', 'danger')
+        flash('ስህተት፡ የአሁኑ ንባብ ከቀደመው ሊያንስ አይችልም!', 'danger')
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/pay_bill/<int:id>')
@@ -221,9 +210,7 @@ def pay_bill(id):
         flash('ክፍያ ተፈጽሞ መረጃው ተቀምጧል!', 'success')
     return redirect(url_for('admin_dashboard'))
 
-# -------------------------------------------------------------------------
-# ማሻሻያ 1: የወር ማሻገሪያ ፋንክሽን (የተሟላ የዕዳ ዝውውር መቆጣጠሪያ)
-# -------------------------------------------------------------------------
+# ✅ የተስተካከለ እና የተጠናቀቀ የወር ማሻገሪያ ፋንክሽን
 @app.route('/admin/next_month', methods=['POST'])
 def next_month():
     if session.get('role') != 'admin':
@@ -232,3 +219,19 @@ def next_month():
     config = SystemConfig.query.first()
     old_month = config.current_month_name
     
+    customers = User.query.filter_by(role='customer').all()
+    for c in customers:
+        consumption = max(0.0, c.current_reading - c.previous_reading)
+        
+        # 1. ላልከፈሉ ደንበኞች የታሪክ መዝገብ መፍጠር እና ዕዳ ማሸጋገር
+        if c.status == 'Unpaid':
+            history_bill = Bill(
+                user_id=c.id, customer_name=c.name, meter_number=c.meter_number,
+                month_name=old_month, prev_reading=c.previous_reading,
+                curr_reading=c.current_reading, consumption=consumption,
+                base_amount=c.base_bill, penalty_amount=c.penalty, old_debt_amount=c.old_debt,
+                total_amount=c.balance, status='Unpaid'
+            )
+            db.session.add(history_bill)
+            c.old_debt = c.balance  # አጠቃላይ ዕዳ ወደ ቆየ ዕዳነት ይዞራል
+        else:
