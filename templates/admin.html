@@ -1,168 +1,178 @@
 <!DOCTYPE html>
-<html lang="am">
+<html lang="am" dir="ltr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>የበቶ ውሃ - የአስተዳዳሪ ማዕከል</title>
-    <link rel="stylesheet" href="https://jsdelivr.net">
-    <script src="https://jsdelivr.net"></script>
+    <!-- Bootstrap 5 CSS እና FontAwesome ለአዶዎች -->
+    <link href="https://jsdelivr.net" rel="stylesheet">
+    <link href="https://cloudflare.com" rel="stylesheet">
     <style>
-        body { background-color: #f4f7f6; font-family: system-ui; }
-        .navbar-custom { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; }
-        .card-stat { border: none; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        .table-container { background: white; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 20px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; bg-light: #f8f9fa; }
+        .navbar-brand { font-weight: bold; }
+        .card-stat { border-left: 5px solid; transition: transform 0.2s; }
+        .card-stat:hover { transform: translateY(-3px); }
     </style>
 </head>
-<body>
-    <nav class="navbar navbar-custom shadow-sm p-3 mb-4">
-        <div class="container-fluid d-flex justify-content-between align-items-center">
-            <span class="navbar-brand mb-0 h1 text-white fw-bold">💧 የበቶ ውሃ ጽ/ቤት መቆጣጠሪያ ማዕከል</span>
-            <a href="{{ url_for('logout') }}" class="btn btn-outline-light rounded-pill px-4">🔒 ውጣ</a>
+<body class="bg-light">
+
+    <!-- የላይኛው አሞሌ (Navbar) -->
+    <nav class="navbar navbar-dark bg-primary shadow-sm mb-4">
+        <div class="container">
+            <span class="navbar-brand mb-0 h1"><i class="fas fa-droplet me-2"></i> የበቶ ውሃ ጽ/ቤት መቆጣጠሪያ ማዕከል</span>
+            <a href="#" class="btn btn-outline-light btn-sm"><i class="fas fa-sign-out-alt me-1"></i> ውጣ</a>
         </div>
     </nav>
 
-    <div class="container-fluid px-4">
+    <div class="container mb-5">
+        <!-- የፍላሽ መልእክቶች ማሳያ -->
         {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for category, message in messages %}
-              <div class="alert alert-{{ category }} alert-dismissible fade show text-center" role="alert">{{ message }}</div>
-            {% endfor %}
-          {% endif %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
         {% endwith %}
 
-        <div class="row mb-4">
-            <div class="col-md-3 mb-2">
-                <div class="card card-stat bg-success text-white p-3 h-100">
-                    <small>የዚህ ወር የተሰበሰበ ገቢ</small>
-                    <h3 class="fw-bold mt-1">{{ total_collected }} ብር</h3>
+        <!-- የፋይናንስ ማጠቃለያ ካርዶች -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <div class="card card-stat shadow-sm border-success bg-white p-3">
+                    <div class="text-muted small text-uppercase">የዚህ ወር የተሰበሰበ ገቢ</div>
+                    <div class="fs-3 fw-bold text-success">{{ total_collected }} <small>ብር</small></div>
                 </div>
             </div>
-            <div class="col-md-3 mb-2">
-                <div class="card card-stat bg-danger text-white p-3 h-100">
-                    <small>የሕዝብ ቀሪ ዕዳ ማጠቃለያ</small>
-                    <h3 class="fw-bold mt-1">{{ total_unpaid }} ብር</h3>
-                </div>
-            </div>
-            <div class="col-md-6 mb-2">
-                <div class="card card-stat bg-white text-dark p-3 h-100 border-start border-primary border-5">
-                    <h6 class="fw-bold text-primary">⚙️ የጽ/ቤት ይፋዊ መረጃዎች እና መክፈያ ቀን ቅንብር</h6>
-                    <form action="/admin/update_config" method="POST" class="row g-2 mt-1">
-                        <div class="col-4">
-                            <small class="text-muted">መክፈያ ቀን</small>
-                            <input type="date" name="due_date" class="form-control form-control-sm" value="{{ due_date }}" required>
-                        </div>
-                        <div class="col-4">
-                            <small class="text-muted">ጽ/ቤት ስልክ</small>
-                            <input type="text" name="office_phone" class="form-control form-control-sm" value="{{ config.office_phone }}" required>
-                        </div>
-                        <div class="col-4">
-                            <small class="text-muted">CBE ባንክ አካውንት</small>
-                            <input type="text" name="bank_account" class="form-control form-control-sm" value="{{ config.bank_account }}" required>
-                        </div>
-                        <div class="col-12">
-                            <small class="text-muted">ጽ/ቤት አድራሻ</small>
-                            <input type="text" name="office_address" class="form-control form-control-sm" value="{{ config.office_address }}" required>
-                        </div>
-                        <div class="col-12 text-end">
-                            <button type="submit" class="btn btn-primary btn-sm w-100">💾 የቢሮ መረጃዎችን አድስ</button>
-                        </div>
-                    </form>
+            <div class="col-md-6">
+                <div class="card card-stat shadow-sm border-danger bg-white p-3">
+                    <div class="text-muted small text-uppercase">የሕዝብ ቀሪ ዕዳ ማጠቃለያ</div>
+                    <div class="fs-3 fw-bold text-danger">{{ total_unpaid }} <small>ብር</small></div>
                 </div>
             </div>
         </div>
 
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="table-container">
-                    <h5 class="fw-bold text-dark mb-3">📊 የደንበኞች የ{{ current_month }} ወር የውሃ ፍጆታ መጠን (በዩኒት)</h5>
-                    <div style="height: 200px; position: relative;">
-                        <canvas id="consumptionChart"></canvas>
+        <div class="row g-4">
+            <!-- የግራ ክፍል፡ ቅንብሮች እና ሪፖርቶች -->
+            <div class="col-lg-4">
+                <!-- የጽ/ቤት መረጃ ቅንብር -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white fw-bold"><i class="fas fa-gear me-2 text-secondary"></i>የጽ/ቤት መረጃዎች ቅንብር</div>
+                    <div class="card-body">
+                        <form method="POST" action="">
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">መክፈያ ቀን</label>
+                                <input type="text" class="form-control form-control-sm" value="{{ due_date }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">ጽ/ቤት ስልክ</label>
+                                <input type="text" class="form-control form-control-sm" value="{{ config.office_phone }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">CBE ባንክ አካውንት</label>
+                                <input type="text" class="form-control form-control-sm" value="{{ config.bank_account }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">ጽ/ቤት አድራሻ</label>
+                                <input type="text" class="form-control form-control-sm" value="{{ config.office_address }}">
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-save me-1"></i> የቢሮ መረጃዎችን አድስ</button>
+                        </form>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- 🚀 የላቀ የፍጆታ ትንታኔ ሰንጠረዥ -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="table-container border-start border-warning border-5">
-                    <h5 class="fw-bold text-warning mb-2">⚠️ የላቀ የፍጆታ ትንታኔ (ከ20 ዩኒት በላይ የተጠቀሙ ከፍተኛ ደንበኞች)</h5>
-                    {% if high_consumers %}
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped">
-                            <thead>
-                                <tr><th>የደንበኛ ስም</th><th>የቆጣሪ ቁጥር</th><th>የወሩ ፍጆታ (ዩኒት)</th><th>ሁኔታ</th></tr>
-                            </thead>
-                            <tbody>
-                                {% for h in high_consumers %}
-                                <tr><td>{{ h.name }}</td><td><span class="badge bg-dark">{{ h.meter }}</span></td><td class="fw-bold text-danger">{{ h.usage }} ዩኒት</td><td><span class="text-danger">⚠️ ከፍተኛ ብክነት/ፍጆታ</span></td></tr>
+                <!-- የወራት ሪፖርት ማውረጃ (ወደ Dropdown የተቀየረ) -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white fw-bold"><i class="fas fa-file-excel me-2 text-success"></i>የወራት ሪፖርት በExcel</div>
+                    <div class="card-body">
+                        <div class="dropdown">
+                            <button class="btn btn-outline-success btn-sm w-100 dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                ማውረድ የሚፈልጉትን ወር ይምረጡ
+                            </button>
+                            <ul class="dropdown-menu w-100">
+                                {% for m in ["ጥቅምት", "ህዳር", "ታህሳስ", "ጥር", "የካቲት", "መጋቢት", "ሚያዝያ", "ግንቦት", "ሰኔ", "ሐምሌ", "ነሐሴ", "ጳጉሜን"] %}
+                                    <li><a class="dropdown-item" href="#"><i class="fas fa-table me-2"></i>የ{{ m }} ወር Excel</a></li>
                                 {% endfor %}
-                            </tbody>
-                        </table>
+                            </ul>
+                        </div>
                     </div>
-                    {% else %}
-                    <p class="text-muted small mb-0">በዚህ ወር ከ20 ዩኒት በላይ የተጠቀመ ከፍተኛ ባክናኝ ደንበኛ አልተገኘም።</p>
-                    {% endif %}
                 </div>
-            </div>
-        </div>
 
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="table-container bg-light">
-                    <h6 class="fw-bold text-dark mb-2">📥 የወራትን ሪፖርት ለብቻ ለብቻ በExcel አውርድ</h6>
-                    <div class="d-flex flex-wrap gap-2">
-                        {% for m in ["ጥቅምት", "ህዳር", "ታህሳስ", "ጥር", "የካቲት", "መጋቢት", "ሚያዝያ", "ግንቦት", "ሰኔ", "ሐምሌ", "ነሐሴ", "ጳጉሜን"] %}
-                        <a href="/admin/export_excel/{{ m }}" class="btn btn-sm btn-outline-success">📊 የ{{ m }} ወር Excel</a>
-                        {% endfor %}
+                <!-- አዲስ ወር ማሻገሪያ -->
+                <div class="card shadow-sm border-warning mb-4">
+                    <div class="card-header bg-light-warning fw-bold text-warning-emphasis"><i class="fas fa-calendar-alt me-2"></i>የወር ማሻገሪያ</div>
+                    <div class="card-body text-center">
+                        <p class="small text-muted">አዲስ ወር ለመጀመር እና መረጃዎችን ለማስተጋባት ይህንን ይጠቀሙ።</p>
+                        <button class="btn btn-warning btn-sm w-100 text-dark" onclick="return confirm('እርግጠኛ ነዎት ወር መቀየር ይፈልጋሉ? ይህ እርምጃ ሊመለስ አይችልም!')">
+                            <i class="fas fa-sync me-1"></i> ወር ቀይር
+                        </button>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="row">
-            <div class="col-md-4 mb-4">
-                <div class="table-container">
-                    <h5 class="fw-bold text-primary mb-3">👤 አዲስ ደንበኛ መመዝገብ</h5>
-                    <form action="/admin/add_customer" method="POST">
-                        <div class="mb-2"><input type="text" name="name" class="form-control" placeholder="የደንበኛ ሙሉ ስም" required></div>
-                        <div class="mb-2"><input type="text" name="username" class="form-control" placeholder="የተጠቃሚ ስም" required></div>
-                        <div class="mb-2"><input type="password" name="password" class="form-control" placeholder="የይለፍ ቃል" required></div>
-                        <div class="mb-2"><input type="text" name="phone" class="form-control" placeholder="ስልክ ቁጥር" required></div>
-                        <div class="mb-3"><input type="text" name="meter_number" class="form-control" placeholder="የቆጣሪ ቁጥር" required></div>
-                        <button type="submit" class="btn btn-success w-100">💾 ደንበኛውን መዝግብ</button>
-                    </form>
-                    <hr>
-                    <h6 class="fw-bold text-danger mb-2">📅 አዲስ ወር ለመጀመር ማሻገሪያ</h6>
-                    <form action="/admin/next_month" method="POST" onsubmit="return confirm('ያልተከፈሉ ዕዳዎች በሙሉ ወደ ተራዘመ ዕዳ ታሪክ ይዛወራሉ!')">
-                        <input type="text" name="next_month_name" class="form-control form-control-sm mb-2" placeholder="የቀጣይ ወር ስም" required>
-                        <button type="submit" class="btn btn-danger btn-sm w-100">🔄 ወር ቀይር</button>
-                    </form>
+            <!-- የቀኝ ክፍል፡ የደንበኞች ዝርዝር እና ትንታኔ -->
+            <div class="col-lg-8">
+                <!-- የላቀ የፍጆታ ትንታኔ -->
+                <div class="card shadow-sm mb-4 border-danger">
+                    <div class="card-header bg-danger text-white fw-bold">
+                        <i class="fas fa-exclamation-triangle me-2"></i>የላቀ የፍጆታ ትንታኔ (ከ20 ዩኒት በላይ)
+                    </div>
+                    <div class="card-body p-0">
+                        {% if high_consumers %}
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped mb-0 valign-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>የደንበኛ ስም</th>
+                                        <th>የቆጣሪ ቁጥር</th>
+                                        <th>የወሩ ፍጆታ</th>
+                                        <th>ሁኔታ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for h in high_consumers %}
+                                    <tr>
+                                        <td class="fw-bold">{{ h.name }}</td>
+                                        <td><code>{{ h.meter }}</code></td>
+                                        <td><span class="badge bg-danger">{{ h.usage }} ዩኒት</span></td>
+                                        <td><span class="text-danger small fw-bold"><i class="fas fa-circle-exclamation me-1"></i>ከፍተኛ ፍጆታ</span></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="p-3 text-center text-muted small">
+                            <i class="fas fa-check-circle text-success me-1"></i> በዚህ ወር ከ20 ዩኒት በላይ የተጠቀመ ከፍተኛ ባክናኝ ደንበኛ አልተገኘም።
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
-            </div>
 
-            <div class="col-md-8">
-                <div class="table-container">
-                    <h5 class="fw-bold text-dark mb-3">📋 የነዋሪዎች መረጃ መቆጣጠሪያ ሰንጠረዥ</h5>
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>ደንበኛ</th><th>ቆጣሪ</th><th>የቀድሞ</th><th>ጠቅላላ ዕዳ</th><th>ሁኔታ</th><th class="text-center">እርምጃ</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for c in customers %}
-                                <tr>
-                                    <td><span class="fw-bold">{{ c.name }}</span><br><small class="text-muted">📱 {{ c.phone }}</small></td>
-                                    <td><span class="badge bg-secondary">{{ c.meter_number }}</span></td>
-                                    <td>{{ c.previous_reading }}</td>
-                                    <td>
-                                        <span class="text-dark fw-bold">{{ c.balance }} ብር</span>
-                                        {% if c.penalty > 0 %}<br><small class="text-danger">⚠️ (+{{ c.penalty }} ቅጣት)</small>{% endif %}
-                                        {% if c.old_debt > 0 %}<br><small class="text-warning">⏳ (+{{ c.old_debt }} የቆየ ዕዳ)</small>{% endif %}
-                                    </td>
-                                    <td><span class="badge {% if c.status=='Paid' %}bg-success{% else %}bg-danger{% endif %}">{% if c.status=='Paid' %}ተከፍሏል{% else %}አልተከፈለም{% endif %}</span></td>
-                                    <td>
-                                        <div class="d-flex gap-1 justify-content-center">
-                                            <form action="/admin/enter_reading" method="POST" class="d-flex gap-1">
+                <!-- የነዋሪዎች መረጃ መቆጣጠሪያ ሰንጠረዥ -->
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <span class="fw-bold"><i class="fas fa-users me-2 text-primary"></i>የነዋሪዎች መረጃ መቆጣጠሪያ ሰንጠረዥ ({{ current_month }} ወር)</span>
+                        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addCustomerModal">
+                            <i class="fas fa-user-plus me-1"></i> አዲስ ደንበኛ
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ደንበኛ</th>
+                                        <th>ቆጣሪ</th>
+                                        <th>የቀድሞ</th>
+                                        <th>ጠቅላላ ዕዳ</th>
+                                        <th>ሁኔታ</th>
+                                        <th>እርምጃ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for c in customers %}
+                                    <tr>
+                                        <td>
+                                            <div class="fw-bold">{{ c.name }}</div>
