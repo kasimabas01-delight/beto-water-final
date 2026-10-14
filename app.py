@@ -4,15 +4,16 @@ import io
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, session, flash, make_response
 from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = 'beto_water_super_secret_key_2026_advanced_v30'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///beto_water_v30.db'
+app.secret_key = 'beto_water_super_secret_key_2026_advanced_v3'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///beto_water_v3.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy()
 db.init_app(app)
+
+# ----------------- የዳታቤዝ ሞዴሎች -----------------
 
 class SystemConfig(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -20,14 +21,14 @@ class SystemConfig(db.Model):
     due_date = db.Column(db.String(50), default="2026-10-30")
     office_phone = db.Column(db.String(50), default="0911223344")
     office_address = db.Column(db.String(100), default="በቶ ከተማ፣ ዋናው አስፓልት አጠገብ")
-    bank_account = db.Column(db.String(100), default="1000123456789 (የኢትዮጵያ ንግድ ባንክ)")
+    bank_account = db.Column(db.String(100), default="1000123456789 (CBE)")
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     username = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(20), default='customer')
+    password = db.Column(db.String(100), nullable=False)
+    role = db.Column(db.String(20), default='customer') # admin, reader, customer
     phone = db.Column(db.String(20))
     meter_number = db.Column(db.String(50), unique=True, nullable=True)
     previous_reading = db.Column(db.Float, default=0.0)
@@ -53,13 +54,14 @@ class Bill(db.Model):
     total_amount = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default='Unpaid')
 
+# ዳታቤዙን መፍጠር እና የመጀመሪያ መረጃ መሙላት
 with app.app_context():
     db.create_all()
     if not SystemConfig.query.first():
-        config = SystemConfig()
-        db.session.add(config)
+        db.session.add(SystemConfig())
     db.session.commit()
 
+# 💰 የደረጃ ታሪፍ ስሌት
 def calculate_block_tariff(consumption):
     amount = 0.0
     if consumption <= 10:
@@ -70,36 +72,44 @@ def calculate_block_tariff(consumption):
         amount = (10 * 15.0) + (10 * 20.0) + ((consumption - 20) * 30.0)
     return amount
 
+# ----------------- ROUTES (የገጽታ መቆጣጠሪያዎች) -----------------
+
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        if 'username' in request.form and 'password' in request.form:
-            username = request.form['username'].strip()
-            password = request.form['password'].strip()
-            
-            # ደህንነቱ የተጠበቀ አስተዳዳሪ መግቢያ (ለጊዜው ቀጥታ ፍተሻ)
-            if username == 'beto' and password == 'beto@1234':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        meter_num = request.form.get('meter_number', '').strip()
+
+        # 1. የአስተዳዳሪ እና ቆጣሪ አንባቢ መግቢያ
+        if username and password:
+            if username == 'admin' and password == 'admin@123':
                 session.clear()
                 session['role'] = 'admin'
-                session['user_id'] = 9999
                 return redirect(url_for('admin_dashboard'))
-            flash('የአስተዳዳሪ ስም ወይም የይለፍ ቃል ተሳስቷል!', 'danger')
-        elif 'meter_number' in request.form:
-            meter_num = request.form['meter_number'].strip()
+            elif username == 'reader' and password == 'reader@123':
+                session.clear()
+                session['role'] = 'reader'
+                return redirect(url_for('reader_dashboard'))
+            flash('የመግቢያ ስም ወይም የይለፍ ቃል ተሳስቷል!', 'danger')
+            
+        # 2. የደንበኛ በቆጣሪ ቁጥር ብቻ መግቢያ
+        elif meter_num:
             user = User.query.filter_by(meter_number=meter_num, role='customer').first()
             if user:
                 session.clear()
                 session['user_id'] = user.id
-                session['role'] = user.role
+                session['role'] = 'customer'
                 return redirect(url_for('customer_dashboard'))
-            flash('ይህ የቆጣሪ ቁጥር በሲስተሙ ውስጥ አልተገኘም!', 'danger')
+            flash('ይህ የቆጣሪ ቁጥር አልተገኘም!', 'danger')
+            
     return render_template('login.html')
 
+# 📊 1. የአስተዳዳሪ ማዕከል
 @app.route('/admin')
 def admin_dashboard():
-    if session.get('role') != 'admin':
-        return redirect(url_for('login'))
+    if session.get('role') != 'admin': return redirect(url_for('login'))
     config = SystemConfig.query.first()
     customers = User.query.filter_by(role='customer').all()
     
@@ -107,23 +117,17 @@ def admin_dashboard():
     total_unpaid = sum(c.balance for c in customers if c.status == 'Unpaid')
     
     high_consumers = []
-    graph_labels = []
-    graph_data = []
     for c in customers:
         consumption = max(0.0, c.current_reading - c.previous_reading)
-        graph_labels.append(c.name)
-        graph_data.append(consumption)
         if consumption >= 20:
             high_consumers.append({'name': c.name, 'meter': c.meter_number, 'usage': consumption})
             
     return render_template('admin.html', customers=customers, total_collected=total_collected, total_unpaid=total_unpaid,
-                           current_month=config.current_month_name, due_date=config.due_date, config=config,
-                           graph_labels=graph_labels, graph_data=graph_data, high_consumers=high_consumers)
+                           current_month=config.current_month_name, due_date=config.due_date, config=config, high_consumers=high_consumers)
 
 @app.route('/admin/update_config', methods=['POST'])
 def update_config():
-    if session.get('role') != 'admin':
-        return redirect(url_for('login'))
+    if session.get('role') != 'admin': return redirect(url_for('login'))
     config = SystemConfig.query.first()
     if config:
         config.due_date = request.form['due_date']
@@ -131,90 +135,83 @@ def update_config():
         config.office_address = request.form['office_address']
         config.bank_account = request.form['bank_account']
         db.session.commit()
-        flash('የቢሮ መረጃዎች በስኬት ታድሰዋል!', 'success')
+        flash('የቢሮ መረጃዎች ታድሰዋል!', 'success')
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/add_customer', methods=['POST'])
 def add_customer():
-    if session.get('role') != 'admin':
-        return redirect(url_for('login'))
-    name = request.form['name']
-    username = request.form['username']
-    raw_password = request.form['password']
-    phone = request.form['phone']
-    meter_number = request.form['meter_number']
-    
-    # የይለፍ ቃልን ሃሽ በማድረግ ደህንነቱን መጠበቅ
-    hashed_password = generate_password_hash(raw_password)
-    
-    new_cust = User(name=name, username=username, password=hashed_password, phone=phone, meter_number=meter_number)
+    if session.get('role') != 'admin': return redirect(url_for('login'))
+    new_cust = User(
+        name=request.form['name'], username=request.form['username'], password='123',
+        phone=request.form['phone'], meter_number=request.form['meter_number'], role='customer'
+    )
     try:
         db.session.add(new_cust)
         db.session.commit()
         flash('አዲስ ደንበኛ ተመዝግቧል!', 'success')
     except:
-        flash('ስህተት ተከስቷል! መረጃው ተደግሟል።', 'danger')
+        flash('ስህተት ተከስቷል! የቆጣሪ ወይም የተጠቃሚ ስም ተደግሟል።', 'danger')
     return redirect(url_for('admin_dashboard'))
 
-@app.route('/admin/enter_reading', methods=['POST'])
-def enter_reading():
-    if session.get('role') != 'admin':
-        return redirect(url_for('login'))
-    user_id = request.form['user_id']
-    current_read = float(request.form['current_reading'])
-    user = User.query.get(user_id)
+# 📱 2. የቆጣሪ አንባቢ ማዕከል (ለመስክ ሰራተኛ)
+@app.route('/reader', methods=['GET', 'POST'])
+def reader_dashboard():
+    if session.get('role') != 'reader': return redirect(url_for('login'))
     config = SystemConfig.query.first()
+    customers = User.query.filter_by(role='customer').all()
     
-    if user and current_read >= user.previous_reading:
-        consumption = current_read - user.previous_reading
-        user.base_bill = calculate_block_tariff(consumption)
+    if request.method == 'POST':
+        user_id = request.form['user_id']
+        current_read = float(request.form['current_reading'])
+        user = User.query.get(user_id)
         
-        today_str = datetime.now().strftime('%Y-%m-%d')
-        user.penalty = 100.0 if today_str > config.due_date else 0.0
-        
-        user.current_reading = current_read
-        user.balance = user.base_bill + user.old_debt + user.penalty
-        user.status = 'Unpaid' if user.balance > 0 else 'Paid'
-        
-        db.session.commit()
-        flash('የወሩ ፍጆታ በደረጃ ታሪፍ በትክክል ተሰልቷል!', 'success')
-    else:
-        flash('ስህተት፡ የአሁኑ ንባብ ከቀደመው ሊያንስ አይችልም!', 'danger')
-    return redirect(url_for('admin_dashboard'))
+        if user and current_read >= user.previous_reading:
+            consumption = current_read - user.previous_reading
+            user.base_bill = calculate_block_tariff(consumption)
+            
+            # የቅጣት ስሌት (ከቀን ካለፈ 100 ብር)
+            today_str = datetime.now().strftime('%Y-%m-%d')
+            user.penalty = 100.0 if today_str > config.due_date else 0.0
+            
+            user.current_reading = current_read
+            user.balance = user.base_bill + user.old_debt + user.penalty
+            user.status = 'Unpaid' if user.balance > 0 else 'Paid'
+            
+            db.session.commit()
+            flash(f'ለ {user.name} የዚህ ወር ንባብ ገብቷል! ፍጆታ፡ {consumption} ዩኒት።', 'success')
+        else:
+            flash('ስህተት፡ የአሁኑ ንባብ ካለፈው ወር ሊያንስ አይችልም!', 'danger')
+            
+    return render_template('reader.html', customers=customers, current_month=config.current_month_name)
 
+# 💳 3. የሂሳብ ክፍያ መቀበያ
 @app.route('/admin/pay_bill/<int:id>')
 def pay_bill(id):
-    if session.get('role') != 'admin':
-        return redirect(url_for('login'))
+    if session.get('role') != 'admin': return redirect(url_for('login'))
     user = User.query.get(id)
     config = SystemConfig.query.first()
     if user:
-        consumption = user.current_reading - user.previous_reading
-        new_bill_history = Bill(
+        consumption = max(0.0, user.current_reading - user.previous_reading)
+        new_bill = Bill(
             user_id=user.id, customer_name=user.name, meter_number=user.meter_number,
             month_name=config.current_month_name, prev_reading=user.previous_reading,
             curr_reading=user.current_reading, consumption=consumption,
             base_amount=user.base_bill, penalty_amount=user.penalty, old_debt_amount=user.old_debt,
             total_amount=user.balance, status='Paid'
         )
-        db.session.add(new_bill_history)
+        db.session.add(new_bill)
         
-        user.previous_reading = user.current_reading
-        user.current_reading = 0.0
-        user.base_bill = 0.0
-        user.penalty = 0.0
-        user.old_debt = 0.0
-        user.balance = 0.0
+        user.previous_reading = user.current_reading if user.current_reading > 0 else user.previous_reading
+        user.current_reading, user.base_bill, user.penalty, user.old_debt, user.balance = 0.0, 0.0, 0.0, 0.0, 0.0
         user.status = 'Paid'
         db.session.commit()
-        flash('ክፍያ ተፈጽሞ መረጃው ተቀምጧል!', 'success')
+        flash('ክፍያ ተፈጽሞ መረጃው ወደ ታሪክ መዝገብ ተዛውሯል!', 'success')
     return redirect(url_for('admin_dashboard'))
 
-# ✅ የተስተካከለ እና የተጠናቀቀ የወር ማሻገሪያ ፋንክሽን
+# 🔄 4. የተጠናቀቀ የወር ማሻገሪያ
 @app.route('/admin/next_month', methods=['POST'])
 def next_month():
-    if session.get('role') != 'admin':
-        return redirect(url_for('login'))
+    if session.get('role') != 'admin': return redirect(url_for('login'))
     next_month_name = request.form['next_month_name']
     config = SystemConfig.query.first()
     old_month = config.current_month_name
@@ -222,8 +219,6 @@ def next_month():
     customers = User.query.filter_by(role='customer').all()
     for c in customers:
         consumption = max(0.0, c.current_reading - c.previous_reading)
-        
-        # 1. ላልከፈሉ ደንበኞች የታሪክ መዝገብ መፍጠር እና ዕዳ ማሸጋገር
         if c.status == 'Unpaid':
             history_bill = Bill(
                 user_id=c.id, customer_name=c.name, meter_number=c.meter_number,
@@ -232,6 +227,3 @@ def next_month():
                 base_amount=c.base_bill, penalty_amount=c.penalty, old_debt_amount=c.old_debt,
                 total_amount=c.balance, status='Unpaid'
             )
-            db.session.add(history_bill)
-            c.old_debt = c.balance  # አጠቃላይ ዕዳ ወደ ቆየ ዕዳነት ይዞራል
-        else:
