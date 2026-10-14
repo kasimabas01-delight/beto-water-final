@@ -54,7 +54,6 @@ class Bill(db.Model):
     total_amount = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default='Unpaid')
 
-# ዳታቤዙን መፍጠር እና የመጀመሪያ መረጃ መሙላት
 with app.app_context():
     db.create_all()
     if not SystemConfig.query.first():
@@ -72,7 +71,7 @@ def calculate_block_tariff(consumption):
         amount = (10 * 15.0) + (10 * 20.0) + ((consumption - 20) * 30.0)
     return amount
 
-# ----------------- ROUTES (የገጽታ መቆጣጠሪያዎች) -----------------
+# ----------------- ROUTES -----------------
 
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/login', methods=['GET', 'POST'])
@@ -82,7 +81,7 @@ def login():
         password = request.form.get('password', '').strip()
         meter_num = request.form.get('meter_number', '').strip()
 
-        # 1. የአስተዳዳሪ እና ቆጣሪ አንባቢ መግቢያ
+        # ✅ የአስተዳዳሪ እና ቆጣሪ አንባቢ ትክክለኛ መግቢያ ፍተሻ
         if username and password:
             if username == 'admin' and password == 'admin@123':
                 session.clear()
@@ -94,7 +93,7 @@ def login():
                 return redirect(url_for('reader_dashboard'))
             flash('የመግቢያ ስም ወይም የይለፍ ቃል ተሳስቷል!', 'danger')
             
-        # 2. የደንበኛ በቆጣሪ ቁጥር ብቻ መግቢያ
+        # የደንበኛ በቆጣሪ ቁጥር መግቢያ
         elif meter_num:
             user = User.query.filter_by(meter_number=meter_num, role='customer').first()
             if user:
@@ -153,7 +152,7 @@ def add_customer():
         flash('ስህተት ተከስቷል! የቆጣሪ ወይም የተጠቃሚ ስም ተደግሟል።', 'danger')
     return redirect(url_for('admin_dashboard'))
 
-# 📱 2. የቆጣሪ አንባቢ ማዕከል (ለመስክ ሰራተኛ)
+# 📱 2. የቆጣሪ አንባቢ ማዕከል
 @app.route('/reader', methods=['GET', 'POST'])
 def reader_dashboard():
     if session.get('role') != 'reader': return redirect(url_for('login'))
@@ -169,7 +168,6 @@ def reader_dashboard():
             consumption = current_read - user.previous_reading
             user.base_bill = calculate_block_tariff(consumption)
             
-            # የቅጣት ስሌት (ከቀን ካለፈ 100 ብር)
             today_str = datetime.now().strftime('%Y-%m-%d')
             user.penalty = 100.0 if today_str > config.due_date else 0.0
             
@@ -208,7 +206,7 @@ def pay_bill(id):
         flash('ክፍያ ተፈጽሞ መረጃው ወደ ታሪክ መዝገብ ተዛውሯል!', 'success')
     return redirect(url_for('admin_dashboard'))
 
-# 🔄 4. የተጠናቀቀ የወር ማሻገሪያ
+# 🔄 4. የወር ማሻገሪያ
 @app.route('/admin/next_month', methods=['POST'])
 def next_month():
     if session.get('role') != 'admin': return redirect(url_for('login'))
@@ -227,3 +225,7 @@ def next_month():
                 base_amount=c.base_bill, penalty_amount=c.penalty, old_debt_amount=c.old_debt,
                 total_amount=c.balance, status='Unpaid'
             )
+            db.session.add(history_bill)
+            c.old_debt = c.balance 
+        else:
+            c.old_debt = 0.0
