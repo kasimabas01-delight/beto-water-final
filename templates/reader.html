@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>የበቶ ውሃ - ቆጣሪ አንባቢ</title>
+    <link href="https://jsdelivr.net" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-info mb-3 shadow-sm">
+        <div class="container">
+            <span class="navbar-brand fw-bold">💦 የመስክ ንባብ ማስገቢያ ({{current_month}})</span>
+            <a href="/logout" class="btn btn-outline-light btn-sm">ውጣ</a>
+        </div>
+    </nav>
+
+    <div class="container mb-5">
+        {% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}{% for cat, msg in messages %}
+            <div class="alert alert-{{cat}} py-2 small">{{msg}}</div>
+        {% endfor %}{% endif %}{% endwith %}
+
+        {% for c in customers %}
+        <div class="card mb-3 shadow-sm border-0">
+            <div class="card-body">
+                <h6 class="fw-bold text-primary mb-1">{{ c.name }}</h6>
+                <div class="text-muted small mb-2">🔢 ቆጣሪ፡ <code>{{ c.meter_number }}</code> | ⏳ የቀድሞ ንባብ፡ <strong class="text-danger">{{ c.previous_reading }}</strong></div>
+                
+                <form method="POST" class="row g-2">
+                    <input type="hidden" name="user_id" value="{{ c.id }}">
+                    <div class="col-8"><input type="number" step="0.01" name="current_reading" class="form-control form-control-sm" placeholder="የአሁኑን ንባብ ያስገቡ" required></div>
+                    <div class="col-4"><button type="submit" class="btn btn-success btn-sm w-100">መዝግብ</button></div>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</body>
+</html>
