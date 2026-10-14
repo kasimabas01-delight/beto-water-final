@@ -13,6 +13,9 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy()
 db.init_app(app)
 
+# -------------------------------------------------------------------------
+# DATABASE MODELS
+# -------------------------------------------------------------------------
 class SystemConfig(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     current_month_name = db.Column(db.String(50), default="ጥቅምት")
@@ -25,16 +28,16 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     username = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(200), nullable=False)
+    password = db.Column(db.String(200), nullable=False) # ማሳሰቢያ፡ ለደህንነት ሲባል በኋላ ላይ Werkzeug Hashing ቢጠቀሙ ይመረጣል
     role = db.Column(db.String(20), default='customer')
     phone = db.Column(db.String(20))
     meter_number = db.Column(db.String(50), unique=True, nullable=True)
     previous_reading = db.Column(db.Float, default=0.0)
     current_reading = db.Column(db.Float, default=0.0)
-    base_bill = db.Column(db.Float, default=0.0) # የወሩ ንጹህ የውሃ ሂሳብ
-    penalty = db.Column(db.Float, default=0.0)    # የደነገገው ቅጣት
-    old_debt = db.Column(db.Float, default=0.0)   # የቆየ የተራዘመ ዕዳ
-    balance = db.Column(db.Float, default=0.0)    # ጠቅላላ ዕዳ (የወሩ + የቆየ + ቅጣት)
+    base_bill = db.Column(db.Float, default=0.0) 
+    penalty = db.Column(db.Float, default=0.0)    
+    old_debt = db.Column(db.Float, default=0.0)   
+    balance = db.Column(db.Float, default=0.0)    
     status = db.Column(db.String(20), default='Paid')
 
 class Bill(db.Model):
@@ -59,7 +62,9 @@ with app.app_context():
         db.session.add(config)
     db.session.commit()
 
-# 🚀 የደረጃ ታሪፍ ስሌት ረቂቅ (Block Tariff Function)
+# -------------------------------------------------------------------------
+# TARIFF CALCULATION (የደረጃ ታሪፍ ስሌት)
+# -------------------------------------------------------------------------
 def calculate_block_tariff(consumption):
     amount = 0.0
     if consumption <= 10:
@@ -70,6 +75,9 @@ def calculate_block_tariff(consumption):
         amount = (10 * 15.0) + (10 * 20.0) + ((consumption - 20) * 30.0)
     return amount
 
+# -------------------------------------------------------------------------
+# ROUTES & AUTHENTICATION
+# -------------------------------------------------------------------------
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -94,6 +102,15 @@ def login():
             flash('ይህ የቆጣሪ ቁጥር በሲስተሙ ውስጥ አልተገኘም!', 'danger')
     return render_template('login.html')
 
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('በስኬት ወጥተዋል!', 'success')
+    return redirect(url_for('login'))
+
+# -------------------------------------------------------------------------
+# ADMIN DASHBOARD
+# -------------------------------------------------------------------------
 @app.route('/admin')
 def admin_dashboard():
     if session.get('role') != 'admin':
@@ -104,7 +121,6 @@ def admin_dashboard():
     total_collected = db.session.query(db.func.sum(Bill.total_amount)).filter(Bill.month_name == config.current_month_name, Bill.status == 'Paid').scalar() or 0.0
     total_unpaid = sum(c.balance for c in customers if c.status == 'Unpaid')
     
-    # 🚀 የላቀ የፍጆታ ትንታኔ (ከ20 ዩኒት በላይ የተጠቀሙ ከፍተኛ ደንበኞች)
     high_consumers = []
     graph_labels = []
     graph_data = []
@@ -162,21 +178,19 @@ def enter_reading():
     
     if user and current_read >= user.previous_reading:
         consumption = current_read - user.previous_reading
-        
-        # 🚀 1. የደረጃ ታሪፍ ስሌት ጥሪ
         user.base_bill = calculate_block_tariff(consumption)
         
-        # 🚀 2. የቅጣት ስሌት (ከቀን ካለፈ 100 ብር)
         today_str = datetime.now().strftime('%Y-%m-%d')
         user.penalty = 100.0 if today_str > config.due_date else 0.0
         
-        # ጠቅላላ ዕዳ = የወሩ ፍጆታ ሂሳብ + የቆየ የተራዘመ ዕዳ + ቅጣት
         user.current_reading = current_read
         user.balance = user.base_bill + user.old_debt + user.penalty
         user.status = 'Unpaid' if user.balance > 0 else 'Paid'
         
         db.session.commit()
         flash('የወሩ ፍጆታ በደረጃ ታሪፍ በትክክል ተሰልቷል!', 'success')
+    else:
+        flash('የገባው የአሁን ንባብ ከቀደመው ንባብ ማነስ የለበትም!', 'danger')
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/pay_bill/<int:id>')
@@ -207,7 +221,9 @@ def pay_bill(id):
         flash('ክፍያ ተፈጽሞ መረጃው ተቀምጧል!', 'success')
     return redirect(url_for('admin_dashboard'))
 
-# 🚀 3. የተራዘመ ዕዳ አያያዝ (ወር ሲቀየር ያልከፈሉትን ዕዳ ይዞ ወደ ቀጣይ ወር ማሻገሪያ)
+# -------------------------------------------------------------------------
+# ማሻሻያ 1: የወር ማሻገሪያ ፋንክሽን (የተሟላ የዕዳ ዝውውር መቆጣጠሪያ)
+# -------------------------------------------------------------------------
 @app.route('/admin/next_month', methods=['POST'])
 def next_month():
     if session.get('role') != 'admin':
@@ -216,21 +232,3 @@ def next_month():
     config = SystemConfig.query.first()
     old_month = config.current_month_name
     
-    customers = User.query.filter_by(role='customer').all()
-    for c in customers:
-        if c.status == 'Unpaid':
-            consumption = c.current_reading - c.previous_reading
-            history_bill = Bill(
-                user_id=c.id, customer_name=c.name, meter_number=c.meter_number,
-                month_name=old_month, prev_reading=c.previous_reading,
-                curr_reading=c.current_reading, consumption=consumption,
-                base_amount=c.base_bill, penalty_amount=c.penalty, old_debt_amount=c.old_debt,
-                total_amount=c.balance, status='Unpaid'
-            )
-            db.session.add(history_bill)
-            
-            # ያለፈውን ወር ጠቅላላ ዕዳ ወደ "የቆየ ዕዳ" ማዛወር
-            c.old_debt = c.balance
-        else:
-            c.old_debt = 0.0
-            
