@@ -6,8 +6,8 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
-app.secret_key = 'beto_water_super_secret_key_2026_advanced_v3'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///beto_water_v3.db'
+app.secret_key = 'beto_water_super_secret_key_2026_advanced_v3_fixed'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///beto_water_final_v5.db' # አዲስ ንጹህ ዳታቤዝ
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy()
@@ -54,10 +54,26 @@ class Bill(db.Model):
     total_amount = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default='Unpaid')
 
+# 🚀 ዌብሳይቱ ሲነሳ ዳታቤዙን እና ዋና ዋና ተጠቃሚዎችን በራሱ የሚፈጥር ክፍል
 with app.app_context():
     db.create_all()
+    
+    # 1. የቢሮ ቅንብር መፍጠር
     if not SystemConfig.query.first():
         db.session.add(SystemConfig())
+    
+    # 2. የአስተዳዳሪ (admin) አካውንት በራሱ ዳታቤዝ ውስጥ እንዲፈጠር ማድረግ
+    admin_user = User.query.filter_by(username='admin').first()
+    if not admin_user:
+        new_admin = User(name="ዋና አስተዳዳሪ", username="admin", password="admin@123", role="admin")
+        db.session.add(new_admin)
+        
+    # 3. የቆጣሪ አንባቢ (reader) አካውንት በራሱ ዳታቤዝ ውስጥ እንዲፈጠር ማድረግ
+    reader_user = User.query.filter_by(username='reader').first()
+    if not reader_user:
+        new_reader = User(name="ቆጣሪ አንባቢ 1", username="reader", password="reader@123", role="reader")
+        db.session.add(new_reader)
+        
     db.session.commit()
 
 # 💰 የደረጃ ታሪፍ ስሌት
@@ -71,7 +87,7 @@ def calculate_block_tariff(consumption):
         amount = (10 * 15.0) + (10 * 20.0) + ((consumption - 20) * 30.0)
     return amount
 
-# ----------------- ROUTES -----------------
+# ----------------- ROUTES (የመግቢያ ፍተሻዎች) -----------------
 
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/login', methods=['GET', 'POST'])
@@ -81,19 +97,19 @@ def login():
         password = request.form.get('password', '').strip()
         meter_num = request.form.get('meter_number', '').strip()
 
-        # ✅ የአስተዳዳሪ እና ቆጣሪ አንባቢ ትክክለኛ መግቢያ ፍተሻ
         if username and password:
-            if username == 'admin' and password == 'admin@123':
+            # ቀጥታ ዳታቤዝ ውስጥ ያለውን አካውንት ፈልጎ መፈተሽ
+            user = User.query.filter_by(username=username, password=password).first()
+            if user:
                 session.clear()
-                session['role'] = 'admin'
-                return redirect(url_for('admin_dashboard'))
-            elif username == 'reader' and password == 'reader@123':
-                session.clear()
-                session['role'] = 'reader'
-                return redirect(url_for('reader_dashboard'))
+                session['role'] = user.role
+                session['user_id'] = user.id
+                if user.role == 'admin':
+                    return redirect(url_for('admin_dashboard'))
+                elif user.role == 'reader':
+                    return redirect(url_for('reader_dashboard'))
             flash('የመግቢያ ስም ወይም የይለፍ ቃል ተሳስቷል!', 'danger')
             
-        # የደንበኛ በቆጣሪ ቁጥር መግቢያ
         elif meter_num:
             user = User.query.filter_by(meter_number=meter_num, role='customer').first()
             if user:
@@ -214,18 +230,3 @@ def next_month():
     config = SystemConfig.query.first()
     old_month = config.current_month_name
     
-    customers = User.query.filter_by(role='customer').all()
-    for c in customers:
-        consumption = max(0.0, c.current_reading - c.previous_reading)
-        if c.status == 'Unpaid':
-            history_bill = Bill(
-                user_id=c.id, customer_name=c.name, meter_number=c.meter_number,
-                month_name=old_month, prev_reading=c.previous_reading,
-                curr_reading=c.current_reading, consumption=consumption,
-                base_amount=c.base_bill, penalty_amount=c.penalty, old_debt_amount=c.old_debt,
-                total_amount=c.balance, status='Unpaid'
-            )
-            db.session.add(history_bill)
-            c.old_debt = c.balance 
-        else:
-            c.old_debt = 0.0
