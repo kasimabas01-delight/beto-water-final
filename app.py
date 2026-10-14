@@ -6,8 +6,11 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
-app.secret_key = 'beto_water_super_secret_key_2026_advanced_v3_fixed'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///beto_water_final_v5.db' # አዲስ ንጹህ ዳታቤዝ
+app.secret_key = 'beto_water_super_secret_key_2026_advanced_v3_fixed_final'
+
+# ✅ የዳታቤዝ ፋይሉን ስም ወደ 'beto_water_production_v9.db' ቀይሬዋለሁ።
+# ይህ ሲስተሙ Render ላይ አዲስ እና ንጹህ ዳታቤዝ በራሱ አውቶማቲክ እንዲፈጥር ያስገድደዋል።
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///beto_water_production_v9.db' 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy()
@@ -54,21 +57,20 @@ class Bill(db.Model):
     total_amount = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default='Unpaid')
 
-# 🚀 ዌብሳይቱ ሲነሳ ዳታቤዙን እና ዋና ዋና ተጠቃሚዎችን በራሱ የሚፈጥር ክፍል
+# 🚀 አዲስ ንጹህ ሰንጠረዦችን እና መግቢያዎችን በራሱ የሚፈጥር አስተማማኝ ክፍል
 with app.app_context():
     db.create_all()
     
-    # 1. የቢሮ ቅንብር መፍጠር
     if not SystemConfig.query.first():
         db.session.add(SystemConfig())
     
-    # 2. የአስተዳዳሪ (admin) አካውንት በራሱ ዳታቤዝ ውስጥ እንዲፈጠር ማድረግ
+    # ዋና አስተዳዳሪን በራሱ መፍጠር
     admin_user = User.query.filter_by(username='admin').first()
     if not admin_user:
         new_admin = User(name="ዋና አስተዳዳሪ", username="admin", password="admin@123", role="admin")
         db.session.add(new_admin)
         
-    # 3. የቆጣሪ አንባቢ (reader) አካውንት በራሱ ዳታቤዝ ውስጥ እንዲፈጠር ማድረግ
+    # ቆጣሪ አንባቢን በራሱ መፍጠር
     reader_user = User.query.filter_by(username='reader').first()
     if not reader_user:
         new_reader = User(name="ቆጣሪ አንባቢ 1", username="reader", password="reader@123", role="reader")
@@ -87,7 +89,7 @@ def calculate_block_tariff(consumption):
         amount = (10 * 15.0) + (10 * 20.0) + ((consumption - 20) * 30.0)
     return amount
 
-# ----------------- ROUTES (የመግቢያ ፍተሻዎች) -----------------
+# ----------------- ROUTES -----------------
 
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/login', methods=['GET', 'POST'])
@@ -98,7 +100,6 @@ def login():
         meter_num = request.form.get('meter_number', '').strip()
 
         if username and password:
-            # ቀጥታ ዳታቤዝ ውስጥ ያለውን አካውንት ፈልጎ መፈተሽ
             user = User.query.filter_by(username=username, password=password).first()
             if user:
                 session.clear()
@@ -121,7 +122,6 @@ def login():
             
     return render_template('login.html')
 
-# 📊 1. የአስተዳዳሪ ማዕከል
 @app.route('/admin')
 def admin_dashboard():
     if session.get('role') != 'admin': return redirect(url_for('login'))
@@ -168,7 +168,6 @@ def add_customer():
         flash('ስህተት ተከስቷል! የቆጣሪ ወይም የተጠቃሚ ስም ተደግሟል።', 'danger')
     return redirect(url_for('admin_dashboard'))
 
-# 📱 2. የቆጣሪ አንባቢ ማዕከል
 @app.route('/reader', methods=['GET', 'POST'])
 def reader_dashboard():
     if session.get('role') != 'reader': return redirect(url_for('login'))
@@ -198,7 +197,6 @@ def reader_dashboard():
             
     return render_template('reader.html', customers=customers, current_month=config.current_month_name)
 
-# 💳 3. የሂሳብ ክፍያ መቀበያ
 @app.route('/admin/pay_bill/<int:id>')
 def pay_bill(id):
     if session.get('role') != 'admin': return redirect(url_for('login'))
@@ -222,7 +220,6 @@ def pay_bill(id):
         flash('ክፍያ ተፈጽሞ መረጃው ወደ ታሪክ መዝገብ ተዛውሯል!', 'success')
     return redirect(url_for('admin_dashboard'))
 
-# 🔄 4. የወር ማሻገሪያ
 @app.route('/admin/next_month', methods=['POST'])
 def next_month():
     if session.get('role') != 'admin': return redirect(url_for('login'))
@@ -230,3 +227,5 @@ def next_month():
     config = SystemConfig.query.first()
     old_month = config.current_month_name
     
+    customers = User.query.filter_by(role='customer').all()
+    for c in customers:
